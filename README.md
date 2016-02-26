@@ -6,7 +6,7 @@ You will need [Apache Maven](https://maven.apache.org/) and the [Java SE 8 JDK](
 
 To build run `mvn clean compile assembly:single` from the root of this project. This will create an executable jar file in the target directory which can then be used from the command line as follows:
  
-    java -jar target/batch-transformer-1.0-SNAPSHOT-jar-with-dependencies.jar html src/test/resources src/test/resources src/test/resources/ptv.xsl target=resources
+    java -jar target/batch-transformer-1.0-SNAPSHOT-jar-with-dependencies.jar html src/test/resources src/test/resources src/test/resources/test.xsl name=Rob
 
 The available command line paramters are as follows:
 
