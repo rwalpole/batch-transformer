@@ -3,11 +3,13 @@
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     exclude-result-prefixes="xs"
     version="2.0">
+    <xsl:output method="html" version="5.0" encoding="UTF-8" indent="yes" omit-xml-declaration="yes"/>
     <xsl:strip-space elements="*"/>
+    <xsl:param name="name" required="yes"/>
     <xsl:template match="/books">
         <html>
             <head>
-                <title>Book</title>
+                <title><xsl:value-of select="concat($name,'''s Books')"/></title>
             </head>
             <body>
                 <xsl:apply-templates/>
