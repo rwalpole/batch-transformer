@@ -6,10 +6,11 @@
     <xsl:output method="html" version="5.0" encoding="UTF-8" indent="yes" omit-xml-declaration="yes"/>
     <xsl:strip-space elements="*"/>
     <xsl:param name="name" required="yes"/>
+    <xsl:param name="year" required="yes"/>
     <xsl:template match="/books">
         <html>
             <head>
-                <title><xsl:value-of select="concat($name,'''s Books')"/></title>
+                <title><xsl:value-of select="concat($name,'''s Books ',$year)"/></title>
             </head>
             <body>
                 <xsl:apply-templates/>
