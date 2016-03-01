@@ -1,6 +1,7 @@
 package uk.co.devexe
 
-import java.io.File
+import java.io.{FilenameFilter, File}
+import java.net.URI
 import javax.xml.transform.stream.StreamSource
 
 import net.sf.saxon.s9api._
@@ -15,6 +16,8 @@ import scala.collection.mutable
   */
 object BatchTransformer {
 
+  val LOG = LoggerFactory.getLogger(classOf[BatchTransformer]);
+
   def main(args: Array[String]): Unit = {
 
     if(args.length < 4) {
@@ -25,28 +28,32 @@ object BatchTransformer {
     val targetDir = args(2)
     val xsltPath = args(3)
 
-    if(args.length > 4) {
-      if(!args(4).contains("=")){
-        val prefix = args(4)
-        if(!args(5).contains("=")){
-          val outPrefix = args(5)
-          val params = extractParams(args, 6)
-          val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some(prefix), Some(outPrefix))
-          trans.run
-        }else {
-          val params = extractParams(args, 5)
-          val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some(prefix), None)
+    try{
+      if(args.length > 4) {
+        if(!args(4).contains("=")){
+          val prefix = args(4)
+          if(!args(5).contains("=")){
+            val outPrefix = args(5)
+            val params = extractParams(args, 6)
+            val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some(prefix), Some(outPrefix))
+            trans.run
+          }else {
+            val params = extractParams(args, 5)
+            val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some(prefix), None)
+            trans.run
+          }
+        }else{
+          val params = extractParams(args, 4)
+          val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), None, None)
           trans.run
         }
+
       }else{
-        val params = extractParams(args, 4)
-        val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), None, None)
+        val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, None, None, None)
         trans.run
       }
-
-    }else{
-      val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, None, None, None)
-      trans.run
+    } catch {
+      case ex: BatchTransformerException => LOG.error(ex.getMessage)
     }
   }
 
@@ -80,7 +87,7 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
   val LOG = LoggerFactory.getLogger(classOf[BatchTransformer]);
 
   def run() {
-    LOG.info("Executing transformation with source={} target={} xslt={} output={} params={} prefix={}", sourcePath, targetPath, xsltPath, output, params, prefixOpt, outPrefixOpt)
+    LOG.info("Executing transformation with source={} target={} xslt={} output={} params={} prefix={} output-prefix={}", sourcePath, targetPath, xsltPath, output, params, prefixOpt, outPrefixOpt)
     val proc = new Processor(false)
     val comp = proc.newXsltCompiler()
     val exec = comp.compile(new StreamSource(new File(xsltPath)))
@@ -95,7 +102,8 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
     }
 
     val srcDir = new File(sourcePath)
-    srcDir.listFiles.filter(_.getName.endsWith(".xml")).filter(_.getName.startsWith(prefix)) map { xmlFile =>
+    val targetDir = new File(targetPath)
+    srcDir.listFiles(new XmlFilenameFilter(prefixOpt)) map { xmlFile =>
       params match {
         case Some(params) => {
           params map { param =>
@@ -104,19 +112,27 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
         }
         case None =>
       }
-      val source = proc.newDocumentBuilder().build(new StreamSource(new File(srcDir, xmlFile.getName)))
-      val target = getOutputFile(xmlFile, targetPath, output, prefix, outPrefix)
-      val out = proc.newSerializer(target)
-      out.setOutputProperty(Serializer.Property.METHOD, output)
-      out.setOutputProperty(Serializer.Property.INDENT, "yes")
+      val source = proc.newDocumentBuilder().build(new StreamSource(xmlFile))
+      val target = getOutputFile(xmlFile, targetDir, output, prefix, outPrefix)
       trans.setInitialContextNode(source)
-      trans.setDestination(out)
-      trans.transform()
+      trans.setDestination(getSerializer(target, proc))
+      try {
+        trans.transform()
+      } catch {
+        case ex: SaxonApiException => throw BatchTransformerException(cause = ex)
+      }
       LOG.info("Output written to " + target.getPath);
     }
   }
 
-  private def getOutputFile(inFile: File, targetPath: String, output: String, inPrefix: String, outPrefix: String): File = {
+  private def getSerializer(target: File, processor: Processor): Serializer = {
+    val out = processor.newSerializer(target)
+    out.setOutputProperty(Serializer.Property.METHOD, output)
+    out.setOutputProperty(Serializer.Property.INDENT, "yes")
+    out
+  }
+
+  private def getOutputFile(inFile: File, targetDir: File, output: String, inPrefix: String, outPrefix: String): File = {
     if(output.equals("html")) {
       if(!inPrefix.equals("") && !outPrefix.equals("")){
         new File(targetPath, inFile.getName.replace(".xml", ".html").replace(inPrefix, outPrefix))
@@ -127,9 +143,33 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
       if(!inPrefix.equals("") && !outPrefix.equals("")){
         new File(targetPath, inFile.getName.replace(inPrefix,outPrefix))
       }else{
+        if(inFile.getParentFile.getPath.equals(targetDir.getPath)) {
+          throw BatchTransformerException(message = "Output file " + targetDir + File.separator + inFile.getName + " cannot be the same as input " + inFile.getPath)
+        }
         new File(targetPath, inFile.getName)
       }
     }
   }
 
 }
+
+class XmlFilenameFilter(prefixOpt: Option[String]) extends FilenameFilter {
+  override def accept(dir: File, name: String): Boolean = {
+    if(name.endsWith(".xml")){
+      prefixOpt match {
+        case Some(prefix) => {
+          if(name.startsWith(prefix)) {
+            true
+          } else {
+            false
+          }
+        }
+        case None => true
+      }
+    }else{
+      false
+    }
+  }
+}
+
+case class BatchTransformerException(message: String = null, cause: Throwable = null) extends Exception(message, cause)

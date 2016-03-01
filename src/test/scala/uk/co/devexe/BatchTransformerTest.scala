@@ -2,7 +2,7 @@ package uk.co.devexe
 
 import java.io.File
 
-import org.junit.{Assert, After, Test}
+import org.junit.{Ignore, Assert, After, Test}
 
 import scala.collection.mutable
 
@@ -14,18 +14,25 @@ class BatchTransformerTest {
   val sourceDir = "src/test/resources"
   val targetDir = "src/test/resources"
   val xsltPath = "src/test/resources/test.xsl"
-  val testOutputFile1 = new File(targetDir, "test1.html")
-  val testOutputFile2 = new File(targetDir, "test2.html")
+  val testOutputFile1 = new File(targetDir, "test-1.html")
+  val testOutputFile2 = new File(targetDir, "test-2.html")
 
+  @Ignore
   @Test
   def testRun() {
     val output = "html"
     val params = new mutable.HashMap[String, String]
     params += ("name" -> "Rob")
-    val transformer = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), None, None)
+    params += ("year" -> "2016")
+    val transformer = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some("test"), None)
     transformer.run
     Assert.assertTrue(testOutputFile1.exists)
     Assert.assertTrue(testOutputFile2.exists)
+  }
+
+  @Test
+  def testMain(): Unit = {
+    BatchTransformer.main(Array("html", sourceDir, targetDir, xsltPath, "test", "name=Rob", "year=2016"))
   }
 
   @After
