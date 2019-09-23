@@ -1,11 +1,10 @@
 package uk.co.devexe
 
-import java.io.{FilenameFilter, File}
-import java.net.URI
-import javax.xml.transform.stream.StreamSource
+import java.io.{File, FilenameFilter}
 
+import javax.xml.transform.stream.StreamSource
 import net.sf.saxon.s9api._
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
 
@@ -16,44 +15,53 @@ import scala.collection.mutable
   */
 object BatchTransformer {
 
-  val LOG = LoggerFactory.getLogger(classOf[BatchTransformer]);
+  def apply(sourcePath: String, targetPath: String, xsltPath: String, output: String): BatchTransformer = new BatchTransformer(sourcePath, targetPath, xsltPath, output)
+
+  val LOG: Logger = LoggerFactory.getLogger(classOf[BatchTransformer])
 
   def main(args: Array[String]): Unit = {
 
     if(args.length < 4) {
-      return usage()
-    }
-    val output = args(0)
-    val sourceDir = args(1)
-    val targetDir = args(2)
-    val xsltPath = args(3)
-
-    try{
-      if(args.length > 4) {
-        if(!args(4).contains("=")){
-          val prefix = args(4)
-          if(!args(5).contains("=")){
-            val outPrefix = args(5)
-            val params = extractParams(args, 6)
-            val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some(prefix), Some(outPrefix))
-            trans.run
-          }else {
-            val params = extractParams(args, 5)
-            val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), Some(prefix), None)
-            trans.run
+      usage()
+    } else {
+      val output = args(0)
+      val sourceDir = args(1)
+      val targetDir = args(2)
+      val xsltPath = args(3)
+      val transformer = BatchTransformer(sourceDir, targetDir, xsltPath,output)
+      args.length match {
+        case 4 =>
+          transformer.transform()
+        case 5 =>
+          if(args(4).contains("=")){
+            val params = extractParams(args, 4)
+            transformer.transform(params = Some(params))
+          } else {
+            val prefix = args(4)
+            transformer.transform(prefixOpt = Some(prefix))
           }
-        }else{
-          val params = extractParams(args, 4)
-          val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, Some(params), None, None)
-          trans.run
-        }
-
-      }else{
-        val trans = new BatchTransformer(sourceDir, targetDir, xsltPath, output, None, None, None)
-        trans.run
+        case 6 =>
+          if(args(5).contains("=")){
+            val prefix = args(4)
+            val params = extractParams(args, 5)
+            transformer.transform(params = Some(params), prefixOpt = Some(prefix))
+          } else {
+            val prefix = args(4)
+            val outPrefix = args(5)
+            transformer.transform(prefixOpt = Some(prefix), outPrefixOpt = Some(outPrefix))
+          }
+        case 7 =>
+          val prefix = args(4)
+          val outPrefix = args(5)
+          val params = extractParams(args, 6)
+          transformer.transform(Some(params), Some(prefix), Some(outPrefix))
+        case _ => usage()
       }
-    } catch {
-      case ex: BatchTransformerException => LOG.error(ex.getMessage)
+
+        //}
+//      } catch {
+//        case ex: BatchTransformerException => LOG.error(ex.getMessage)
+//      }
     }
   }
 
@@ -82,11 +90,11 @@ object BatchTransformer {
 
 }
 
-class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String, output: String, params: Option[mutable.Map[String,String]], prefixOpt: Option[String], outPrefixOpt: Option[String]) {
+class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String, output: String) {
 
-  val LOG = LoggerFactory.getLogger(classOf[BatchTransformer]);
+  val LOG: Logger = LoggerFactory.getLogger(classOf[BatchTransformer])
 
-  def run() {
+  def transform(params: Option[mutable.Map[String,String]] = None, prefixOpt: Option[String] = None, outPrefixOpt: Option[String] = None) {
     LOG.info("Executing transformation with source={} target={} xslt={} output={} params={} prefix={} output-prefix={}", sourcePath, targetPath, xsltPath, output, params, prefixOpt, outPrefixOpt)
     val proc = new Processor(false)
     val comp = proc.newXsltCompiler()
@@ -105,11 +113,10 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
     val targetDir = new File(targetPath)
     srcDir.listFiles(new XmlFilenameFilter(prefixOpt)) map { xmlFile =>
       params match {
-        case Some(params) => {
-          params map { param =>
+        case Some(parameters) =>
+          parameters map { param =>
             trans.setParameter(new QName(param._1), new XdmAtomicValue(param._2))
           }
-        }
         case None =>
       }
       val source = proc.newDocumentBuilder().build(new StreamSource(xmlFile))
@@ -121,7 +128,7 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
       } catch {
         case ex: SaxonApiException => throw BatchTransformerException(cause = ex)
       }
-      LOG.info("Output written to " + target.getPath);
+      LOG.info("Output written to " + target.getPath)
     }
   }
 
@@ -135,9 +142,9 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
   private def getOutputFile(inFile: File, targetDir: File, output: String, inPrefix: String, outPrefix: String): File = {
     if(output.equals("html")) {
       if(!inPrefix.equals("") && !outPrefix.equals("")){
-        new File(targetPath, inFile.getName.replace(".xml", ".html").replace(inPrefix, outPrefix))
+        new File(targetPath, inFile.getName.replaceAll("\\.(xml|XML)", ".html").replace(inPrefix, outPrefix))
       }else{
-        new File(targetPath, inFile.getName.replace(".xml", ".html"))
+        new File(targetPath, inFile.getName.replaceAll("\\.(xml|XML)", ".html"))
       }
     }else{
       if(!inPrefix.equals("") && !outPrefix.equals("")){
@@ -155,15 +162,14 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
 
 class XmlFilenameFilter(prefixOpt: Option[String]) extends FilenameFilter {
   override def accept(dir: File, name: String): Boolean = {
-    if(name.endsWith(".xml")){
+    if(name.toLowerCase.endsWith(".xml")){
       prefixOpt match {
-        case Some(prefix) => {
+        case Some(prefix) =>
           if(name.startsWith(prefix)) {
             true
           } else {
             false
           }
-        }
         case None => true
       }
     }else{

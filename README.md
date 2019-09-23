@@ -1,4 +1,4 @@
-#Batch Transformer
+#Batch Transformer#
 
 The purpose of this tool is to provide a wrapper around the [Saxon XSLT processor](http://www.saxonica.com/welcome/welcome.xml) that can be accessed from the command line and enables a batch of files to be processed using a single command and a single instance of Saxon.
 
