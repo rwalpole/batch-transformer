@@ -100,14 +100,8 @@ class BatchTransformer(sourcePath: String, targetPath: String, xsltPath: String,
     val comp = proc.newXsltCompiler()
     val exec = comp.compile(new StreamSource(new File(xsltPath)))
     val trans = exec.load()
-    val prefix = prefixOpt match {
-      case Some(x) => x
-      case None => ""
-    }
-    val outPrefix = outPrefixOpt match {
-      case Some(y) => y
-      case None => ""
-    }
+    val prefix = prefixOpt.getOrElse("")
+    val outPrefix = outPrefixOpt.getOrElse("")
 
     val srcDir = new File(sourcePath)
     val targetDir = new File(targetPath)
