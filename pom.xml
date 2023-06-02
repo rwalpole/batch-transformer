@@ -5,7 +5,7 @@
     <version>1.0-SNAPSHOT</version>
     <inceptionYear>2008</inceptionYear>
     <properties>
-        <scala.version>2.11.7</scala.version>
+        <scala.version>2.13.10</scala.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -114,8 +114,8 @@
     <reporting>
         <plugins>
             <plugin>
-                <groupId>org.scala-tools</groupId>
-                <artifactId>maven-scala-plugin</artifactId>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
                 <configuration>
                     <scalaVersion>${scala.version}</scalaVersion>
                 </configuration>

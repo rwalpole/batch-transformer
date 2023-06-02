@@ -51,10 +51,25 @@ object BatchTransformer {
             transformer.transform(prefixOpt = Some(prefix), outPrefixOpt = Some(outPrefix))
           }
         case 7 =>
-          val prefix = args(4)
-          val outPrefix = args(5)
-          val params = extractParams(args, 6)
-          transformer.transform(Some(params), Some(prefix), Some(outPrefix))
+          if(args(5).contains("=") && args(6).contains("=")){
+            val prefix = args(4)
+            val params = extractParams(args, 5)
+            transformer.transform(params = Some(params), prefixOpt = Some(prefix))
+          } else {
+            val prefix = args(4)
+            val outPrefix = args(5)
+            val params = extractParams(args, 6)
+            transformer.transform(params = Some(params),prefixOpt = Some(prefix), outPrefixOpt = Some(outPrefix))
+          }
+        case 8 =>
+          if(args(6).contains("=") && args(7).contains("=")) {
+            val prefix = args(4)
+            val outPrefix = args(5)
+            val params = extractParams(args, 7)
+            transformer.transform(params = Some(params), prefixOpt = Some(prefix), outPrefixOpt = Some(outPrefix))
+          } else {
+            usage()
+          }
         case _ => usage()
       }
 
@@ -66,9 +81,11 @@ object BatchTransformer {
   }
 
   private def extractParams(args: Array[String], index: Int): mutable.Map[String,String] = {
+    println(s"args=$args")
     val params = new mutable.HashMap[String,String]
     try{
       args.slice(index ,args.length) map { arg =>
+        println(s"arg=$arg")
         if(arg.contains("=")) {
           val param = arg.split("=")
           params += (param(0) -> param(1))
